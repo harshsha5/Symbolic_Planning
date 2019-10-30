@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <stdexcept>
+#include <queue>
 
 #define SYMBOLS 0
 #define INITIAL 1
@@ -368,6 +369,12 @@ public:
         }
         throw runtime_error("Action " + name + " not found!");
     }
+
+    unordered_set<Action, ActionHasher, ActionComparator> get_all_actions()
+    {
+        return actions;
+    }
+
     unordered_set<string> get_symbols() const
     {
         return this->symbols;
@@ -743,21 +750,24 @@ Env* create_env(char* filename)
     return env;
 }
 
+//=====================================================================================================================
+
 struct Node
 {
-    GroundedCondition gc;
-    GroundedCondition parent;
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc;
+    vector<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>> neighbors;
     double gcost;
     double hcost;
     double fcost;
+    static double heuristic_weight;
 
     //---------------------------------------------------------
 
-    Node(GroundedCondition gc1,
-         GroundedCondition gc_parent,
+    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
+         vector<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>>  gc_neighbors,
          double g_cost,
          double h_cost):
-            gc(gc1),parent(gc_parent),gcost(g_cost),hcost(h_cost){
+         gc(gc1),neighbors(gc_neighbors),gcost(g_cost),hcost(h_cost){
         fcost = calculate_fcost();
     }
 
@@ -789,15 +799,18 @@ struct Node
         Node::set_fcost(calculate_fcost());
     }
 
-    void set_parent(const GroundedCondition &new_parent)
+    void add_neighbor(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &new_neighbor)
     {
-        parent = new_parent;
+        neighbors.emplace_back(new_neighbor);
     }
 
     void print_node() const
     {
-        cout<<"State is: "<<gc<<endl;
-        cout<<"Parent is: "<<parent<<endl;
+        cout<<"State is: "<<endl;
+        for(const auto &x:gc)
+        {
+            cout<<x<<"\t";
+        }
         cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
     }
 };
@@ -825,7 +838,7 @@ inline bool operator != (const Node& lhs, const Node& rhs)
 
 //=====================================================================================================================
 
-struct Comp{
+struct Node_Comp{
     bool operator()(const Node &a, const Node &b){
         return a.fcost>b.fcost;
     }
@@ -833,15 +846,95 @@ struct Comp{
 
 //=====================================================================================================================
 
-struct node_hasher
+template <typename T>
+void print_unordered_set(const unordered_set<T> &u_set)
 {
-    size_t operator()(const Node &obj) const
+    for(const auto &x:u_set)
     {
-        return hash<string>{}(obj.gc.toString());
+        cout<<x<<endl;
     }
-};
+}
 
 //=====================================================================================================================
+//
+//template <typename T>
+//list<T> convert_string_to_list(const T &s)
+//{
+//    list<T> my_list;
+//    for(const auto &elt:s)
+//        my_list.emplace_back(elt);
+//    return std::move(my_list);
+//}
+//
+////=====================================================================================================================
+//
+//template <typename T>
+//vector<list<T>> convert_unordered_set_to_vector_of_list(const unordered_set<T> &u_set)
+//{
+//    vector<list<T>> my_vector;
+//    for(const auto &x:u_set)
+//    {
+//        auto my_list = convert_string_to_list(x);
+//        my_vector.emplace_back(my_list);
+//    }
+//
+//    return std::move(my_vector);
+//}
+
+//=====================================================================================================================
+
+unordered_set<string> create_next_round_of_combinations(unordered_set<string> present_symbols_set,
+                                    const unordered_set<string> &all_symbols)
+{
+    unordered_set<string> new_symbols_set;
+    for(const auto &x:present_symbols_set)
+    {
+        for(const auto &y:all_symbols)
+        {
+            new_symbols_set.insert(x+y);
+        }
+    }
+    return std::move(new_symbols_set);
+}
+
+//=====================================================================================================================
+
+unordered_map<int,vector<list<string>>> get_all_possible_actions(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
+                                                const unordered_set<string> &all_symbols)
+{
+    /// TODO: See if I can prune actions which have repeated symbols?
+    unordered_set<int> action_arg_count;   //This maintains count of the arguments in each action
+    int max = -1;
+    for(const auto &action:actions)
+    {
+        int num_action_arguments = action.get_args().size();
+        action_arg_count.insert(num_action_arguments);
+        if(max<num_action_arguments)
+            max = num_action_arguments;
+    }
+
+    unordered_set<string> present_symbols_set = all_symbols;   // This maintains the present combinations of symbols.
+    unordered_map<int,vector<list<string>>> arg_count_symbol_combination_map; //Key is the number of arguments in the action and values are all possible combinations of symbols
+    for(size_t i=1;i<=max;i++)
+    {
+        if(i!=1)
+        {
+            present_symbols_set = create_next_round_of_combinations(std::move(present_symbols_set),all_symbols);
+        }
+
+        if(i==2)
+            print_unordered_set(present_symbols_set);
+
+//        auto present_arg_list = convert_unordered_set_to_vector_of_list(present_symbols_set);
+//        if(action_arg_count.count(i))
+//            arg_count_symbol_combination_map[i] = present_arg_list;
+    }
+
+    return std::move(arg_count_symbol_combination_map);
+}
+
+//=====================================================================================================================
+
 
 list<GroundedAction> planner(Env* env)
 {
@@ -849,7 +942,10 @@ list<GroundedAction> planner(Env* env)
 
     // blocks world example
     list<GroundedAction> actions;
-
+    priority_queue<Node, vector<Node>, Node_Comp> open;
+//    unordered_set<Node,Node_hasher> closed;           /// TODO  See how we are implementing closed list
+    unordered_map<int,Node> node_map;   //This serves as my map since it's an implicit graph
+    auto action_list = get_all_possible_actions(env->get_all_actions(),env->get_symbols());
     actions.push_back(GroundedAction("MoveToTable", { "A", "B" }));
     actions.push_back(GroundedAction("Move", { "C", "Table", "A" }));
     actions.push_back(GroundedAction("Move", { "B", "Table", "C" }));
