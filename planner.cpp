@@ -971,6 +971,25 @@ unordered_map<int,vector<list<string>>> get_all_possible_permutations(const unor
 
 //=====================================================================================================================
 
+unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>
+        get_grounded_conditions(const unordered_set<Condition, ConditionHasher, ConditionComparator> &conditions,
+                                unordered_map<string,string> placeholder_to_symbol_map)
+{
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> grounded_conditions;
+    for(const auto &condition:conditions)
+    {
+        auto new_predicate = condition.get_predicate();
+        auto new_truth = condition.get_truth();
+        auto old_args = condition.get_args();
+        list<string> new_args;
+        for(auto it=old_args.begin();it!=old_args.end();it++)
+        {
+            new_args.emplace_back(placeholder_to_symbol_map[*it]);
+        }
+        grounded_conditions.insert(GroundedCondition{std::move(new_predicate),std::move(new_args),std::move(new_truth)});
+    }
+    return std::move(grounded_conditions);
+}
 
 //=====================================================================================================================
 
@@ -996,9 +1015,23 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
             {
                 placeholder_to_symbol_map[*it_args] = *it_permutation;
             }
-
-//            auto grounded_preconditions = get_grounded_conditions(std::move(precond));
-//            auto grounded_effects = get_grounded_conditions(std::move(effects));
+            cout<<"Action name: "<<action_name<<endl;
+            for(const auto &elt:placeholder_to_symbol_map)
+            {
+                cout<<elt.first<<":"<<elt.second<<endl;
+            }
+            auto grounded_preconditions = get_grounded_conditions(std::move(precond),placeholder_to_symbol_map);
+            for(const auto &elt:grounded_preconditions)
+            {
+                cout<<elt.toString()<<endl;
+            }
+            auto grounded_effects = get_grounded_conditions(std::move(effects),placeholder_to_symbol_map);
+            cout<<"-----------------------------------------------"<<endl;
+            for(const auto &elt:grounded_effects)
+            {
+                cout<<elt.toString()<<endl;
+            }
+            cout<<"==============================================================="<<endl;
 //            all_actions.emplace_back(GroundedAction{action_name,possible_permutations[i],std::move(grounded_preconditions),std::move(grounded_effects)});
         }
     }
