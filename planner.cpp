@@ -421,6 +421,18 @@ public:
         }
     }
 
+    GroundedAction(string naam,
+                    list<string> arg_values,
+                   unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gPreconditions,
+                   unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gEffects):
+          name{naam},gPreconditions{new_gPreconditions},gEffects{new_gEffects}
+    {
+        for (string ar : arg_values)
+        {
+            this->arg_values.push_back(ar);
+        }
+    }
+
     string get_name() const
     {
         return this->name;
@@ -921,8 +933,8 @@ unordered_set<string> create_next_round_of_combinations(unordered_set<string> pr
 
 //=====================================================================================================================
 
-unordered_map<int,vector<list<string>>> get_all_possible_actions(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
-                                                const unordered_set<string> &all_symbols)
+unordered_map<int,vector<list<string>>> get_all_possible_permutations(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
+                                                                      const unordered_set<string> &all_symbols)
 {
     /// TODO: See if I can prune actions which have repeated symbols?
     unordered_set<int> action_arg_count;   //This maintains count of the arguments in each action
@@ -956,6 +968,43 @@ unordered_map<int,vector<list<string>>> get_all_possible_actions(const unordered
 
     return std::move(arg_count_symbol_combination_map);
 }
+
+//=====================================================================================================================
+
+
+//=====================================================================================================================
+
+vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
+                                                const unordered_set<string> &all_symbols)
+{
+    auto permutation_map = get_all_possible_permutations(actions,all_symbols);
+    vector<GroundedAction> all_actions;
+    for(const auto action:actions)
+    {
+        auto action_name = action.get_name();
+        auto precond = action.get_preconditions();
+        auto effects = action.get_effects();
+        auto args = action.get_args();
+        int symbols_in_action = args.size();
+        auto possible_permutations = permutation_map[symbols_in_action];
+        for(int i=0;i<possible_permutations.size();i++)
+        {
+            assert(args.size()==possible_permutations[i].size());
+            auto it_permutation = possible_permutations[i].begin();
+            unordered_map<string,string> placeholder_to_symbol_map;
+            for(auto it_args = args.begin();it_args!=args.end();it_args++,it_permutation++)
+            {
+                placeholder_to_symbol_map[*it_args] = *it_permutation;
+            }
+
+//            auto grounded_preconditions = get_grounded_conditions(std::move(precond));
+//            auto grounded_effects = get_grounded_conditions(std::move(effects));
+//            all_actions.emplace_back(GroundedAction{action_name,possible_permutations[i],std::move(grounded_preconditions),std::move(grounded_effects)});
+        }
+    }
+    return std::move(all_actions);
+}
+
 
 //=====================================================================================================================
 
