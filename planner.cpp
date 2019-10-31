@@ -856,30 +856,52 @@ void print_unordered_set(const unordered_set<T> &u_set)
 }
 
 //=====================================================================================================================
-//
-//template <typename T>
-//list<T> convert_string_to_list(const T &s)
-//{
-//    list<T> my_list;
-//    for(const auto &elt:s)
-//        my_list.emplace_back(elt);
-//    return std::move(my_list);
-//}
-//
-////=====================================================================================================================
-//
-//template <typename T>
-//vector<list<T>> convert_unordered_set_to_vector_of_list(const unordered_set<T> &u_set)
-//{
-//    vector<list<T>> my_vector;
-//    for(const auto &x:u_set)
-//    {
-//        auto my_list = convert_string_to_list(x);
-//        my_vector.emplace_back(my_list);
-//    }
-//
-//    return std::move(my_vector);
-//}
+
+template <typename T>
+void print_list(const list<T> &my_list)
+{
+    for(const auto &x:my_list)
+    {
+        cout<<x<<"->";
+    }
+    cout<<endl;
+}
+
+//=====================================================================================================================
+
+template <typename T>
+list<T> convert_string_to_list(const T &s)
+{
+    list<T> my_list;
+    string temp;
+    for(const auto &elt:s)
+    {
+        if(elt!=',')
+        {
+            temp = temp + elt;
+            continue;
+        }
+        my_list.emplace_back(temp);
+        temp="";
+    }
+    my_list.emplace_back(temp);     //If you remove this the last word won't get added
+    return std::move(my_list);
+}
+
+//=====================================================================================================================
+
+template <typename T>
+vector<list<T>> convert_unordered_set_to_vector_of_list(const unordered_set<T> &u_set)
+{
+    vector<list<T>> my_vector;
+    for(const auto &x:u_set)
+    {
+        auto my_list = convert_string_to_list(x);
+        my_vector.emplace_back(my_list);
+    }
+
+    return std::move(my_vector);
+}
 
 //=====================================================================================================================
 
@@ -891,7 +913,7 @@ unordered_set<string> create_next_round_of_combinations(unordered_set<string> pr
     {
         for(const auto &y:all_symbols)
         {
-            new_symbols_set.insert(x+y);
+            new_symbols_set.insert(x + "," + y);
         }
     }
     return std::move(new_symbols_set);
@@ -915,20 +937,22 @@ unordered_map<int,vector<list<string>>> get_all_possible_actions(const unordered
 
     unordered_set<string> present_symbols_set = all_symbols;   // This maintains the present combinations of symbols.
     unordered_map<int,vector<list<string>>> arg_count_symbol_combination_map; //Key is the number of arguments in the action and values are all possible combinations of symbols
-    for(size_t i=1;i<=max;i++)
+    for(int i=1;i<=max;i++)
     {
         if(i!=1)
         {
             present_symbols_set = create_next_round_of_combinations(std::move(present_symbols_set),all_symbols);
         }
 
-        if(i==2)
-            print_unordered_set(present_symbols_set);
-
-//        auto present_arg_list = convert_unordered_set_to_vector_of_list(present_symbols_set);
-//        if(action_arg_count.count(i))
-//            arg_count_symbol_combination_map[i] = present_arg_list;
+        if(action_arg_count.count(i))
+        {
+            auto present_arg_list = convert_unordered_set_to_vector_of_list(present_symbols_set);
+            arg_count_symbol_combination_map[i] = present_arg_list;
+        }
     }
+
+    /// Note: You can make the code more efficient by starting with lists itself instead of unordered set. That way you wouldn't have to
+    /// convert it to list everytime. Would help avoid the repeated conversions.
 
     return std::move(arg_count_symbol_combination_map);
 }
