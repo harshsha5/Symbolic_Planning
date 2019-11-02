@@ -7,6 +7,3 @@ Actions:
         Preconditions: On(b,x), Clear(b), Block(b), Block(x)
         Effects: On(b,Table), Clear(x), !On(b,x)
 
-        Move(b,x,y)
-        Preconditions: On(b,x), Clear(b), Clear(y), Block(b), Block(y)
-        Effects: On(b,y), Clear(x), !On(b,x), !Clear(y)

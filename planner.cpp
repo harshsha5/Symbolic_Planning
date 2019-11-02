@@ -101,6 +101,8 @@ public:
     string toString() const
     {
         string temp = "";
+        if (!this->truth)
+            temp += "!";
         temp += this->predicate;
         temp += "(";
         for (string l : this->arg_values)
@@ -1032,7 +1034,7 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
                 cout<<elt.toString()<<endl;
             }
             cout<<"==============================================================="<<endl;
-//            all_actions.emplace_back(GroundedAction{action_name,possible_permutations[i],std::move(grounded_preconditions),std::move(grounded_effects)});
+            all_actions.emplace_back(GroundedAction{action_name,possible_permutations[i],std::move(grounded_preconditions),std::move(grounded_effects)});
         }
     }
     return std::move(all_actions);
