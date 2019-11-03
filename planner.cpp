@@ -382,6 +382,16 @@ public:
         return this->symbols;
     }
 
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>  get_initial_conditions() const
+    {
+        return this->initial_conditions;
+    }
+
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>  get_goal_conditions() const
+    {
+        return this->goal_conditions;
+    }
+
     friend ostream& operator<<(ostream& os, const Env& w)
     {
         os << "***** Environment *****" << endl << endl;
@@ -443,6 +453,16 @@ public:
     list<string> get_arg_values() const
     {
         return this->arg_values;
+    }
+
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_preconditions()
+    {
+        return this->gPreconditions;
+    }
+
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_effects()
+    {
+        return this->gEffects;
     }
 
     bool operator==(const GroundedAction& rhs) const
@@ -769,19 +789,30 @@ Env* create_env(char* filename)
 struct Node
 {
     unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc;
-    vector<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>> neighbors;
+    vector<int> neighbors;
+    vector<GroundedAction> parent_gaction;   //This stores, what action of the parent led to this state
     double gcost;
     double hcost;
     double fcost;
+    int index_in_map;
     static double heuristic_weight;
 
     //---------------------------------------------------------
 
     Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
          vector<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>>  gc_neighbors,
+         vector<GroundedAction> parent_g_action,
          double g_cost,
-         double h_cost):
-         gc(gc1),neighbors(gc_neighbors),gcost(g_cost),hcost(h_cost){
+         double h_cost,
+         int map_index):
+         gc(gc1),neighbors(gc_neighbors),parent_gaction(parent_g_action),gcost(g_cost),hcost(h_cost),index_in_map(map_index){
+        fcost = calculate_fcost();
+    }
+
+    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
+         double g_cost,
+         int map_index):
+            gc(gc1),gcost(g_cost),hcost(0),index_in_map(map_index){
         fcost = calculate_fcost();
     }
 
@@ -790,7 +821,7 @@ struct Node
         return gcost + hcost;
     }
 
-    double calculate_hcost(const GroundedCondition &goal_coordinate) const
+    double calculate_hcost(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_coordinate) const
     {
         //Write heuristics formula;
         return 0;
@@ -1040,6 +1071,58 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
     return std::move(all_actions);
 }
 
+//=====================================================================================================================
+
+unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_condition(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
+                                                                                                                  const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
+{
+    for(const auto &effect:action_effects)
+    {
+        if(effect.get_truth())
+            present_grounded_conditions.insert(effect);
+        else
+            sampleSet.erase(sampleSet.find(effect));
+    }
+
+    return std::move(present_grounded_conditions);
+}
+
+//=====================================================================================================================
+
+bool are_all_elements_present_in_collection(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &subset_of_conditions,
+                                            const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &superset_of_conditions)
+{
+    for(const auto &subset_condition:subset_of_conditions)
+    {
+        if(!superset_of_conditions.count(subset_condition))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+//=====================================================================================================================
+
+void expand_state(const Node &present_node,
+                  const vector<GroundedAction> &action_list,
+                  unordered_map<int,Node> &node_map,
+                  priority_queue<Node, vector<Node>, Node_Comp> &open,
+                  int &node_count,
+                  const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_ground_conditions)
+{
+    for(const auto &gaction:action_list)
+    {
+        auto preconds = gaction.get_preconditions();
+
+        if(!are_all_elements_present_in_collection(preconds,present_node.gc))
+            continue;
+
+        auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
+        node_map[node_count] = Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> gaction,present_node.gcost+1,0,node_count};
+        node_map[node_count++].set_hcost(node_map[node_count].calculate_hcost(goal_ground_conditions));
+    }
+}
 
 //=====================================================================================================================
 
@@ -1052,8 +1135,31 @@ list<GroundedAction> planner(Env* env)
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
 //    unordered_set<Node,Node_hasher> closed;           /// TODO  See how we are implementing closed list
-    unordered_map<int,Node> node_map;   //This serves as my map since it's an implicit graph
-    auto action_list = get_all_possible_actions(env->get_all_actions(),env->get_symbols());
+    unordered_map<int,Node> node_map;   //This serves as my map since it's an implicit directed graph
+    const auto action_list = get_all_possible_actions(env->get_all_actions(),env->get_symbols());
+    const auto start_gc = env->get_initial_conditions();
+    const auto goal_gc = env->get_goal_conditions();
+    int node_count = 0;
+    Node start_node{start_gc,0,node_count};
+    node_map[node_count++] = start_node;
+    open.push(start_node);
+    int goal_node = -1;
+    while(!open.empty() && node_count<5)
+    {
+        const auto node_to_expand = open.top();
+        open.pop();
+        if(are_all_elements_present_in_collection(goal_gc,node_to_expand);
+            {
+                cout<<"Goal has been found"<<endl;
+                goal_node = node_to_expand.index_in_map;
+                break;
+            }
+        expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc)
+    }
+
+    if(goal_node!=-1)
+        cout<<"PATH FOUND"<<endl;
+    /// Use the index_in_map to backtrack. Keep selecting parents with lower gcost while backtracking
     actions.push_back(GroundedAction("MoveToTable", { "A", "B" }));
     actions.push_back(GroundedAction("Move", { "C", "Table", "A" }));
     actions.push_back(GroundedAction("Move", { "B", "Table", "C" }));
