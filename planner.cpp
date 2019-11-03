@@ -455,12 +455,12 @@ public:
         return this->arg_values;
     }
 
-    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_preconditions()
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_preconditions() const
     {
         return this->gPreconditions;
     }
 
-    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_effects()
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_effects() const
     {
         return this->gEffects;
     }
@@ -800,7 +800,7 @@ struct Node
     //---------------------------------------------------------
 
     Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
-         vector<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>>  gc_neighbors,
+         vector<int>  gc_neighbors,
          vector<GroundedAction> parent_g_action,
          double g_cost,
          double h_cost,
@@ -1073,7 +1073,7 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
 
 //=====================================================================================================================
 
-unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_condition(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
+unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_conditions(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
                                                                                                                   const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
 {
     for(const auto &effect:action_effects)
@@ -1081,7 +1081,7 @@ unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionCompa
         if(effect.get_truth())
             present_grounded_conditions.insert(effect);
         else
-            sampleSet.erase(sampleSet.find(effect));
+            present_grounded_conditions.erase(present_grounded_conditions.find(effect));
     }
 
     return std::move(present_grounded_conditions);
@@ -1119,7 +1119,7 @@ void expand_state(const Node &present_node,
             continue;
 
         auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
-        node_map[node_count] = Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> gaction,present_node.gcost+1,0,node_count};
+        node_map[node_count] = Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count};
         node_map[node_count++].set_hcost(node_map[node_count].calculate_hcost(goal_ground_conditions));
     }
 }
@@ -1148,13 +1148,13 @@ list<GroundedAction> planner(Env* env)
     {
         const auto node_to_expand = open.top();
         open.pop();
-        if(are_all_elements_present_in_collection(goal_gc,node_to_expand);
+        if(are_all_elements_present_in_collection(goal_gc,node_to_expand.gc))
             {
                 cout<<"Goal has been found"<<endl;
                 goal_node = node_to_expand.index_in_map;
                 break;
             }
-        expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc)
+        expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc);
     }
 
     if(goal_node!=-1)
