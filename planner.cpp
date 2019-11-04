@@ -844,7 +844,7 @@ struct Node
         Node::set_fcost(calculate_fcost());
     }
 
-    void add_neighbor(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &new_neighbor)
+    void add_neighbor(const int &new_neighbor)
     {
         neighbors.emplace_back(new_neighbor);
     }
@@ -1119,8 +1119,9 @@ void expand_state(const Node &present_node,
             continue;
 
         auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
-        node_map[node_count] = Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count};
-        node_map[node_count++].set_hcost(node_map[node_count].calculate_hcost(goal_ground_conditions));
+        node_map.insert({node_count,Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
+        node_map[node_count].set_hcost(node_map[node_count].calculate_hcost(goal_ground_conditions));
+        node_count++;
     }
 }
 
@@ -1141,7 +1142,7 @@ list<GroundedAction> planner(Env* env)
     const auto goal_gc = env->get_goal_conditions();
     int node_count = 0;
     Node start_node{start_gc,0,node_count};
-    node_map[node_count++] = start_node;
+    node_map.insert({node_count++,start_node});
     open.push(start_node);
     int goal_node = -1;
     while(!open.empty() && node_count<5)
