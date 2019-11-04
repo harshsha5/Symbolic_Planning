@@ -70,6 +70,11 @@ public:
         return this->truth;
     }
 
+    void set_truth(const bool &new_truth_val)
+    {
+        this->truth = new_truth_val;
+    }
+
     friend ostream& operator<<(ostream& os, const GroundedCondition& pred)
     {
         os << pred.toString() << " ";
@@ -1074,14 +1079,18 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
 //=====================================================================================================================
 
 unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_conditions(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
-                                                                                                                  const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
+                                                                                                                   const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
 {
-    for(const auto &effect:action_effects)
+    for(auto effect:action_effects)
     {
+        cout<<effect.toString()<<endl;
         if(effect.get_truth())
             present_grounded_conditions.insert(effect);
         else
+        {
+            effect.set_truth(true);
             present_grounded_conditions.erase(present_grounded_conditions.find(effect));
+        }
     }
 
     return std::move(present_grounded_conditions);
@@ -1113,14 +1122,16 @@ void expand_state(const Node &present_node,
 {
     for(const auto &gaction:action_list)
     {
+
         auto preconds = gaction.get_preconditions();
 
         if(!are_all_elements_present_in_collection(preconds,present_node.gc))
             continue;
-
+        cout<<gaction.toString()<<endl;
         auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
-        node_map.insert({node_count,Node{new_grounded_conditions,vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
-        node_map[node_count].set_hcost(node_map[node_count].calculate_hcost(goal_ground_conditions));
+        node_map.insert({node_count,Node{std::move(new_grounded_conditions),vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
+        auto new_h_cost = node_map.at(node_count).calculate_hcost(goal_ground_conditions);
+        node_map.at(node_count).set_hcost(new_h_cost);
         node_count++;
     }
 }
@@ -1148,6 +1159,7 @@ list<GroundedAction> planner(Env* env)
     while(!open.empty() && node_count<5)
     {
         const auto node_to_expand = open.top();
+        node_to_expand.print_node();
         open.pop();
         if(are_all_elements_present_in_collection(goal_gc,node_to_expand.gc))
             {
@@ -1160,6 +1172,14 @@ list<GroundedAction> planner(Env* env)
 
     if(goal_node!=-1)
         cout<<"PATH FOUND"<<endl;
+    else
+        cout<<"PATH NOT FOUND"<<endl;
+
+    for(const auto &x:node_map)
+    {
+        cout<<x.first<<endl;
+    }
+
     /// Use the index_in_map to backtrack. Keep selecting parents with lower gcost while backtracking
     actions.push_back(GroundedAction("MoveToTable", { "A", "B" }));
     actions.push_back(GroundedAction("Move", { "C", "Table", "A" }));
