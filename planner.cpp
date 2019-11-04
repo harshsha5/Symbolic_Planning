@@ -1022,7 +1022,10 @@ unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionCompa
         list<string> new_args;
         for(auto it=old_args.begin();it!=old_args.end();it++)
         {
-            new_args.emplace_back(placeholder_to_symbol_map[*it]);
+            if(placeholder_to_symbol_map.count(*it))
+                new_args.emplace_back(placeholder_to_symbol_map[*it]);
+            else
+                new_args.emplace_back(*it);     //This is for cases eg. MovetoTable(b,x) Effect would include On(b,Table) But table is not in placeholder_to_symbol_map
         }
         grounded_conditions.insert(GroundedCondition{std::move(new_predicate),std::move(new_args),std::move(new_truth)});
     }
@@ -1053,23 +1056,23 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
             {
                 placeholder_to_symbol_map[*it_args] = *it_permutation;
             }
-            cout<<"Action name: "<<action_name<<endl;
-            for(const auto &elt:placeholder_to_symbol_map)
-            {
-                cout<<elt.first<<":"<<elt.second<<endl;
-            }
+//            cout<<"Action name: "<<action_name<<endl;
+//            for(const auto &elt:placeholder_to_symbol_map)
+//            {
+//                cout<<elt.first<<":"<<elt.second<<endl;
+//            }
             auto grounded_preconditions = get_grounded_conditions(std::move(precond),placeholder_to_symbol_map);
-            for(const auto &elt:grounded_preconditions)
-            {
-                cout<<elt.toString()<<endl;
-            }
+//            for(const auto &elt:grounded_preconditions)
+//            {
+//                cout<<elt.toString()<<endl;
+//            }
             auto grounded_effects = get_grounded_conditions(std::move(effects),placeholder_to_symbol_map);
-            cout<<"-----------------------------------------------"<<endl;
-            for(const auto &elt:grounded_effects)
-            {
-                cout<<elt.toString()<<endl;
-            }
-            cout<<"==============================================================="<<endl;
+//            cout<<"-----------------------------------------------"<<endl;
+//            for(const auto &elt:grounded_effects)
+//            {
+//                cout<<elt.toString()<<endl;
+//            }
+//            cout<<"==============================================================="<<endl;
             all_actions.emplace_back(GroundedAction{action_name,possible_permutations[i],std::move(grounded_preconditions),std::move(grounded_effects)});
         }
     }
@@ -1083,7 +1086,6 @@ unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionCompa
 {
     for(auto effect:action_effects)
     {
-        cout<<effect.toString()<<endl;
         if(effect.get_truth())
             present_grounded_conditions.insert(effect);
         else
@@ -1127,11 +1129,12 @@ void expand_state(const Node &present_node,
 
         if(!are_all_elements_present_in_collection(preconds,present_node.gc))
             continue;
-        cout<<gaction.toString()<<endl;
+//        cout<<gaction.toString()<<endl;
         auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
         node_map.insert({node_count,Node{std::move(new_grounded_conditions),vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
         auto new_h_cost = node_map.at(node_count).calculate_hcost(goal_ground_conditions);
         node_map.at(node_count).set_hcost(new_h_cost);
+        open.push(node_map.at(node_count));
         node_count++;
     }
 }
@@ -1156,8 +1159,12 @@ list<GroundedAction> planner(Env* env)
     node_map.insert({node_count++,start_node});
     open.push(start_node);
     int goal_node = -1;
-    while(!open.empty() && node_count<5)
+    int loop_iteration_counter = 1;
+    while(!open.empty())
     {
+        cout<<"Open list size "<<open.size()<<endl;
+        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
+        cout<<"--------------------------"<<endl;
         const auto node_to_expand = open.top();
         node_to_expand.print_node();
         open.pop();
@@ -1168,6 +1175,7 @@ list<GroundedAction> planner(Env* env)
                 break;
             }
         expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc);
+        loop_iteration_counter++;
     }
 
     if(goal_node!=-1)
@@ -1175,10 +1183,10 @@ list<GroundedAction> planner(Env* env)
     else
         cout<<"PATH NOT FOUND"<<endl;
 
-    for(const auto &x:node_map)
-    {
-        cout<<x.first<<endl;
-    }
+//    for(const auto &x:node_map)
+//    {
+//        cout<<x.first<<endl;
+//    }
 
     /// Use the index_in_map to backtrack. Keep selecting parents with lower gcost while backtracking
     actions.push_back(GroundedAction("MoveToTable", { "A", "B" }));
