@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <queue>
+#include <climits>
 
 #define SYMBOLS 0
 #define INITIAL 1
@@ -856,7 +857,7 @@ struct Node
 
     void print_node() const
     {
-        cout<<"State is: "<<endl;
+        cout<<"State index is: "<<index_in_map<<endl;
         for(const auto &x:gc)
         {
             cout<<x<<"\t";
@@ -1141,12 +1142,39 @@ void expand_state(const Node &present_node,
 
 //=====================================================================================================================
 
+list<GroundedAction> back_track(int goal_map_index,
+                                const unordered_map<int,Node> &node_map,
+                                list<GroundedAction> actions,
+                                const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_gc)
+{
+    cout<<"Starting backtracking"<<endl;
+    cout<<"Final goal index "<<goal_map_index<<endl;
+    while(!are_all_elements_present_in_collection(node_map.at(goal_map_index).gc,start_gc))
+    {
+        double g_min = INT_MAX;
+        int best_neighbor_vector_index = -2; //Some impossible value initialization
+        for(int i=0;i<node_map.at(goal_map_index).neighbors.size();i++)
+        {
+            auto parent_index = node_map.at(goal_map_index).neighbors[i];
+            if(node_map.at(parent_index).gcost<g_min)
+            {
+                g_min = node_map.at(parent_index).gcost;
+                best_neighbor_vector_index = i;
+            }
+        }
+        actions.emplace_back(node_map.at(goal_map_index).parent_gaction[best_neighbor_vector_index]);
+        goal_map_index = node_map.at(goal_map_index).neighbors[best_neighbor_vector_index];
+    }
+
+    actions.reverse();
+    return std::move(actions);
+}
+
+//=====================================================================================================================
 
 list<GroundedAction> planner(Env* env)
 {
-    // this is where you insert your planner
 
-    // blocks world example
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
 //    unordered_set<Node,Node_hasher> closed;           /// TODO  See how we are implementing closed list
@@ -1162,8 +1190,7 @@ list<GroundedAction> planner(Env* env)
     int loop_iteration_counter = 1;
     while(!open.empty())
     {
-        cout<<"Open list size "<<open.size()<<endl;
-        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
+//        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
         cout<<"--------------------------"<<endl;
         const auto node_to_expand = open.top();
         node_to_expand.print_node();
@@ -1179,21 +1206,16 @@ list<GroundedAction> planner(Env* env)
     }
 
     if(goal_node!=-1)
+    {
         cout<<"PATH FOUND"<<endl;
+        actions = back_track(goal_node,node_map,std::move(actions),start_gc);
+    }
     else
         cout<<"PATH NOT FOUND"<<endl;
 
-//    for(const auto &x:node_map)
-//    {
-//        cout<<x.first<<endl;
-//    }
+    return std::move(actions);
 
     /// Use the index_in_map to backtrack. Keep selecting parents with lower gcost while backtracking
-    actions.push_back(GroundedAction("MoveToTable", { "A", "B" }));
-    actions.push_back(GroundedAction("Move", { "C", "Table", "A" }));
-    actions.push_back(GroundedAction("Move", { "B", "Table", "C" }));
-
-    return actions;
 }
 
 int main(int argc, char* argv[])
