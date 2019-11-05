@@ -956,26 +956,53 @@ vector<list<T>> convert_unordered_set_to_vector_of_list(const unordered_set<T> &
 
 //=====================================================================================================================
 
-unordered_set<string> create_next_round_of_combinations(unordered_set<string> present_symbols_set,
-                                    const unordered_set<string> &all_symbols)
+//unordered_set<string> create_next_round_of_combinations_old(unordered_set<string> present_symbols_set,
+//                                    const unordered_set<string> &all_symbols)
+//{
+//    unordered_set<string> new_symbols_set;
+//    for(const auto &x:present_symbols_set)
+//    {
+//        for(const auto &y:all_symbols)
+//        {
+//            new_symbols_set.insert(x + "," + y);
+//        }
+//    }
+//    return std::move(new_symbols_set);
+//}
+
+//=====================================================================================================================
+
+vector<list<string>> create_next_round_of_combinations(vector<list<string>> present_symbols_list,
+                                                        const unordered_set<string> &all_symbols,
+                                                        vector<unordered_set<string>> &symbols_present_in_list)
 {
-    unordered_set<string> new_symbols_set;
-    for(const auto &x:present_symbols_set)
+    vector<list<string>> new_symbols_list;
+    vector<unordered_set<string>> new_symbols_present_in_list;
+    int counter = 0;
+    for(const auto &present_symbol:present_symbols_list)
     {
-        for(const auto &y:all_symbols)
+        for(const auto &symbol:all_symbols)
         {
-            new_symbols_set.insert(x + "," + y);
+            if(!symbols_present_in_list[counter].count(symbol))
+            {
+                new_symbols_list.emplace_back(present_symbol);
+                new_symbols_list[new_symbols_list.size()-1].emplace_back(symbol);
+                new_symbols_present_in_list.emplace_back(symbols_present_in_list[counter]);
+                new_symbols_present_in_list[new_symbols_present_in_list.size()-1].insert(symbol);
+            }
         }
+        counter++;
     }
-    return std::move(new_symbols_set);
+    symbols_present_in_list = new_symbols_present_in_list;
+    return std::move(new_symbols_list);
 }
 
 //=====================================================================================================================
 
 unordered_map<int,vector<list<string>>> get_all_possible_permutations(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
-                                                                      const unordered_set<string> &all_symbols)
+                                                                       const unordered_set<string> &all_symbols)
 {
-    /// TODO: See if I can prune actions which have repeated symbols?
+    /// TODO: This gets rid of repeated symbols
     unordered_set<int> action_arg_count;   //This maintains count of the arguments in each action
     int max = -1;
     for(const auto &action:actions)
@@ -987,26 +1014,68 @@ unordered_map<int,vector<list<string>>> get_all_possible_permutations(const unor
     }
 
     unordered_set<string> present_symbols_set = all_symbols;   // This maintains the present combinations of symbols.
+    vector<list<string>> present_symbols_list;
+    vector<unordered_set<string>> symbols_present_in_list;
+    for(const auto &symbol:all_symbols)
+    {
+        present_symbols_list.emplace_back(list<string> {symbol});
+        symbols_present_in_list.emplace_back(unordered_set<string> {symbol});
+    }
+
     unordered_map<int,vector<list<string>>> arg_count_symbol_combination_map; //Key is the number of arguments in the action and values are all possible combinations of symbols
     for(int i=1;i<=max;i++)
     {
         if(i!=1)
         {
-            present_symbols_set = create_next_round_of_combinations(std::move(present_symbols_set),all_symbols);
+            present_symbols_list = create_next_round_of_combinations(std::move(present_symbols_list),all_symbols,symbols_present_in_list);
         }
 
         if(action_arg_count.count(i))
         {
-            auto present_arg_list = convert_unordered_set_to_vector_of_list(present_symbols_set);
-            arg_count_symbol_combination_map[i] = present_arg_list;
+            arg_count_symbol_combination_map[i] = present_symbols_list;
         }
     }
 
-    /// Note: You can make the code more efficient by starting with lists itself instead of unordered set. That way you wouldn't have to
-    /// convert it to list everytime. Would help avoid the repeated conversions.
-
     return std::move(arg_count_symbol_combination_map);
 }
+
+//=====================================================================================================================
+
+//unordered_map<int,vector<list<string>>> get_all_possible_permutations_old(const unordered_set<Action, ActionHasher, ActionComparator> &actions,
+//                                                                      const unordered_set<string> &all_symbols)
+//{
+//    /// TODO: See if I can prune actions which have repeated symbols?
+//    unordered_set<int> action_arg_count;   //This maintains count of the arguments in each action
+//    int max = -1;
+//    for(const auto &action:actions)
+//    {
+//        int num_action_arguments = action.get_args().size();
+//        action_arg_count.insert(num_action_arguments);
+//        if(max<num_action_arguments)
+//            max = num_action_arguments;
+//    }
+//
+//    unordered_set<string> present_symbols_set = all_symbols;   // This maintains the present combinations of symbols.
+//    unordered_map<int,vector<list<string>>> arg_count_symbol_combination_map; //Key is the number of arguments in the action and values are all possible combinations of symbols
+//    for(int i=1;i<=max;i++)
+//    {
+//        if(i!=1)
+//        {
+//            present_symbols_set = create_next_round_of_combinations(std::move(present_symbols_set),all_symbols);
+//        }
+//
+//        if(action_arg_count.count(i))
+//        {
+//            auto present_arg_list = convert_unordered_set_to_vector_of_list(present_symbols_set);
+//            arg_count_symbol_combination_map[i] = present_arg_list;
+//        }
+//    }
+//
+//    /// Note: You can make the code more efficient by starting with lists itself instead of unordered set. That way you wouldn't have to
+//    /// convert it to list everytime. Would help avoid the repeated conversions.
+//
+//    return std::move(arg_count_symbol_combination_map);
+//}
 
 //=====================================================================================================================
 
