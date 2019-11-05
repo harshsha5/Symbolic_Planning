@@ -792,33 +792,75 @@ Env* create_env(char* filename)
 
 //=====================================================================================================================
 
+struct State_hasher
+{
+    size_t operator()(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &gconds) const
+    {
+        vector<string> gconds_vector;
+        for(const auto &gcond:gconds)
+        {
+            gconds_vector.emplace_back(gcond.toString());
+        }
+        sort(gconds_vector.begin(), gconds_vector.end());
+        string total_string;
+        for(const auto elt:gconds_vector)
+        {
+            total_string = total_string + elt;
+        }
+        return hash<string>{}(total_string);
+    }
+};
+
+//=====================================================================================================================
+
+template <typename T>
+void print_unordered_set(const unordered_set<T> &u_set)
+{
+    for(const auto &x:u_set)
+    {
+        cout<<x<<endl;
+    }
+}
+
+//=====================================================================================================================
+
+template <typename T>
+void print_list(const list<T> &my_list)
+{
+    for(const auto &x:my_list)
+    {
+        cout<<x<<"->";
+    }
+    cout<<endl;
+}
+
+//=====================================================================================================================
+
 struct Node
 {
-    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc;
-    vector<int> neighbors;
-    vector<GroundedAction> parent_gaction;   //This stores, what action of the parent led to this state
+    unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,GroundedAction,State_hasher> parents;
+    //Consists of the state and the action pair which yields this state
     double gcost;
     double hcost;
     double fcost;
-    int index_in_map;
     static double heuristic_weight;
 
     //---------------------------------------------------------
 
-    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
-         vector<int>  gc_neighbors,
-         vector<GroundedAction> parent_g_action,
+    Node(unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,GroundedAction,State_hasher> new_parents,
          double g_cost,
-         double h_cost,
-         int map_index):
-         gc(gc1),neighbors(gc_neighbors),parent_gaction(parent_g_action),gcost(g_cost),hcost(h_cost),index_in_map(map_index){
+         double h_cost):
+         parents(new_parents),gcost(g_cost),hcost(h_cost){
         fcost = calculate_fcost();
     }
 
-    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc1,
-         double g_cost,
-         int map_index):
-            gc(gc1),gcost(g_cost),hcost(0),index_in_map(map_index){
+    Node(double g_cost):
+         gcost(g_cost),hcost(0){
+        fcost = calculate_fcost();
+    }
+
+    Node():
+        gcost(0),hcost(0){
         fcost = calculate_fcost();
     }
 
@@ -850,17 +892,24 @@ struct Node
         Node::set_fcost(calculate_fcost());
     }
 
-    void add_neighbor(const int &new_neighbor)
-    {
-        neighbors.emplace_back(new_neighbor);
-    }
-
     void print_node() const
     {
-        cout<<"State index is: "<<index_in_map<<endl;
-        for(const auto &x:gc)
+        if(!parents.size())
+            cout<<"No Parents"<<endl;
+        else
         {
-            cout<<x<<"\t";
+            cout<<"Parents are: "<<endl;
+            for(const auto &x:parents)
+            {
+                cout<<"Parent Grounded conditions"<<endl;
+                for(const auto &elt:x.first)
+                {
+                    cout<<elt.toString()<<"\t";
+                }
+                cout<<endl<<"-----ACTION------"<<endl;
+                cout<<x.second.toString()<<endl;
+                cout<<"===================================================================="<<endl;
+            }
         }
         cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
     }
@@ -875,17 +924,17 @@ inline bool operator < (const Node& lhs, const Node& rhs)
 
 //=====================================================================================================================
 
-inline bool operator == (const Node& lhs, const Node& rhs)
-{
-    return lhs.gc == rhs.gc;
-}
-
-//=====================================================================================================================
-
-inline bool operator != (const Node& lhs, const Node& rhs)
-{
-    return !(lhs==rhs);
-}
+//inline bool operator == (const Node& lhs, const Node& rhs)
+//{
+//    return lhs.gc == rhs.gc;
+//}
+//
+////=====================================================================================================================
+//
+//inline bool operator != (const Node& lhs, const Node& rhs)
+//{
+//    return !(lhs==rhs);
+//}
 
 //=====================================================================================================================
 
@@ -894,29 +943,6 @@ struct Node_Comp{
         return a.fcost>b.fcost;
     }
 };
-
-//=====================================================================================================================
-
-template <typename T>
-void print_unordered_set(const unordered_set<T> &u_set)
-{
-    for(const auto &x:u_set)
-    {
-        cout<<x<<endl;
-    }
-}
-
-//=====================================================================================================================
-
-template <typename T>
-void print_list(const list<T> &my_list)
-{
-    for(const auto &x:my_list)
-    {
-        cout<<x<<"->";
-    }
-    cout<<endl;
-}
 
 //=====================================================================================================================
 
@@ -1060,93 +1086,93 @@ vector<GroundedAction> get_all_possible_actions(const unordered_set<Action, Acti
 
 //=====================================================================================================================
 
-unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_conditions(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
-                                                                                                                   const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
-{
-    for(auto effect:action_effects)
-    {
-        if(effect.get_truth())
-            present_grounded_conditions.insert(effect);
-        else
-        {
-            effect.set_truth(true);
-            present_grounded_conditions.erase(present_grounded_conditions.find(effect));
-        }
-    }
-
-    return std::move(present_grounded_conditions);
-}
-
-//=====================================================================================================================
-
-bool are_all_elements_present_in_collection(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &subset_of_conditions,
-                                            const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &superset_of_conditions)
-{
-    for(const auto &subset_condition:subset_of_conditions)
-    {
-        if(!superset_of_conditions.count(subset_condition))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-//=====================================================================================================================
-
-void expand_state(const Node &present_node,
-                  const vector<GroundedAction> &action_list,
-                  unordered_map<int,Node> &node_map,
-                  priority_queue<Node, vector<Node>, Node_Comp> &open,
-                  int &node_count,
-                  const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_ground_conditions)
-{
-    for(const auto &gaction:action_list)
-    {
-
-        auto preconds = gaction.get_preconditions();
-
-        if(!are_all_elements_present_in_collection(preconds,present_node.gc))
-            continue;
-//        cout<<gaction.toString()<<endl;
-        auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
-        node_map.insert({node_count,Node{std::move(new_grounded_conditions),vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
-        auto new_h_cost = node_map.at(node_count).calculate_hcost(goal_ground_conditions);
-        node_map.at(node_count).set_hcost(new_h_cost);
-        open.push(node_map.at(node_count));
-        node_count++;
-    }
-}
-
-//=====================================================================================================================
-
-list<GroundedAction> back_track(int goal_map_index,
-                                const unordered_map<int,Node> &node_map,
-                                list<GroundedAction> actions,
-                                const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_gc)
-{
-    cout<<"Starting backtracking"<<endl;
-    cout<<"Final goal index "<<goal_map_index<<endl;
-    while(!are_all_elements_present_in_collection(node_map.at(goal_map_index).gc,start_gc))
-    {
-        double g_min = INT_MAX;
-        int best_neighbor_vector_index = -2; //Some impossible value initialization
-        for(int i=0;i<node_map.at(goal_map_index).neighbors.size();i++)
-        {
-            auto parent_index = node_map.at(goal_map_index).neighbors[i];
-            if(node_map.at(parent_index).gcost<g_min)
-            {
-                g_min = node_map.at(parent_index).gcost;
-                best_neighbor_vector_index = i;
-            }
-        }
-        actions.emplace_back(node_map.at(goal_map_index).parent_gaction[best_neighbor_vector_index]);
-        goal_map_index = node_map.at(goal_map_index).neighbors[best_neighbor_vector_index];
-    }
-
-    actions.reverse();
-    return std::move(actions);
-}
+//unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> get_new_grounded_conditions(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
+//                                                                                                                   const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &action_effects)
+//{
+//    for(auto effect:action_effects)
+//    {
+//        if(effect.get_truth())
+//            present_grounded_conditions.insert(effect);
+//        else
+//        {
+//            effect.set_truth(true);
+//            present_grounded_conditions.erase(present_grounded_conditions.find(effect));
+//        }
+//    }
+//
+//    return std::move(present_grounded_conditions);
+//}
+//
+////=====================================================================================================================
+//
+//bool are_all_elements_present_in_collection(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &subset_of_conditions,
+//                                            const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &superset_of_conditions)
+//{
+//    for(const auto &subset_condition:subset_of_conditions)
+//    {
+//        if(!superset_of_conditions.count(subset_condition))
+//        {
+//            return false;
+//        }
+//    }
+//    return true;
+//}
+//
+////=====================================================================================================================
+//
+//void expand_state(const Node &present_node,
+//                  const vector<GroundedAction> &action_list,
+//                  unordered_map<int,Node> &node_map,
+//                  priority_queue<Node, vector<Node>, Node_Comp> &open,
+//                  int &node_count,
+//                  const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_ground_conditions)
+//{
+//    for(const auto &gaction:action_list)
+//    {
+//
+//        auto preconds = gaction.get_preconditions();
+//
+//        if(!are_all_elements_present_in_collection(preconds,present_node.gc))
+//            continue;
+////        cout<<gaction.toString()<<endl;
+//        auto new_grounded_conditions = get_new_grounded_conditions(present_node.gc,gaction.get_effects());
+//        node_map.insert({node_count,Node{std::move(new_grounded_conditions),vector<int> {present_node.index_in_map},vector<GroundedAction> {gaction},present_node.gcost+1,0,node_count}});
+//        auto new_h_cost = node_map.at(node_count).calculate_hcost(goal_ground_conditions);
+//        node_map.at(node_count).set_hcost(new_h_cost);
+//        open.push(node_map.at(node_count));
+//        node_count++;
+//    }
+//}
+//
+////=====================================================================================================================
+//
+//list<GroundedAction> back_track(int goal_map_index,
+//                                const unordered_map<int,Node> &node_map,
+//                                list<GroundedAction> actions,
+//                                const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_gc)
+//{
+//    cout<<"Starting backtracking"<<endl;
+//    cout<<"Final goal index "<<goal_map_index<<endl;
+//    while(!are_all_elements_present_in_collection(node_map.at(goal_map_index).gc,start_gc))
+//    {
+//        double g_min = INT_MAX;
+//        int best_neighbor_vector_index = -2; //Some impossible value initialization
+//        for(int i=0;i<node_map.at(goal_map_index).neighbors.size();i++)
+//        {
+//            auto parent_index = node_map.at(goal_map_index).neighbors[i];
+//            if(node_map.at(parent_index).gcost<g_min)
+//            {
+//                g_min = node_map.at(parent_index).gcost;
+//                best_neighbor_vector_index = i;
+//            }
+//        }
+//        actions.emplace_back(node_map.at(goal_map_index).parent_gaction[best_neighbor_vector_index]);
+//        goal_map_index = node_map.at(goal_map_index).neighbors[best_neighbor_vector_index];
+//    }
+//
+//    actions.reverse();
+//    return std::move(actions);
+//}
 
 //=====================================================================================================================
 
@@ -1155,41 +1181,41 @@ list<GroundedAction> planner(Env* env)
 
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
-//    unordered_set<Node,Node_hasher> closed;           /// TODO  See how we are implementing closed list
-    unordered_map<int,Node> node_map;   //This serves as my map since it's an implicit directed graph
+    unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,Node,State_hasher> node_map; //This serves as my map since it's an implicit directed graph
+    unordered_set<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,State_hasher> closed;
     const auto action_list = get_all_possible_actions(env->get_all_actions(),env->get_symbols());
     const auto start_gc = env->get_initial_conditions();
     const auto goal_gc = env->get_goal_conditions();
     int node_count = 0;
-    Node start_node{start_gc,0,node_count};
-    node_map.insert({node_count++,start_node});
+    Node start_node;
+    node_map.insert({start_gc,start_node});
     open.push(start_node);
     int goal_node = -1;
     int loop_iteration_counter = 1;
-    while(!open.empty())
-    {
-//        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
-        cout<<"--------------------------"<<endl;
-        const auto node_to_expand = open.top();
-        node_to_expand.print_node();
-        open.pop();
-        if(are_all_elements_present_in_collection(goal_gc,node_to_expand.gc))
-            {
-                cout<<"Goal has been found"<<endl;
-                goal_node = node_to_expand.index_in_map;
-                break;
-            }
-        expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc);
-        loop_iteration_counter++;
-    }
-
-    if(goal_node!=-1)
-    {
-        cout<<"PATH FOUND"<<endl;
-        actions = back_track(goal_node,node_map,std::move(actions),start_gc);
-    }
-    else
-        cout<<"PATH NOT FOUND"<<endl;
+//    while(!open.empty())
+//    {
+////        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
+//        cout<<"--------------------------"<<endl;
+//        const auto node_to_expand = open.top();
+//        node_to_expand.print_node();
+//        open.pop();
+//        if(are_all_elements_present_in_collection(goal_gc,node_to_expand.gc))
+//            {
+//                cout<<"Goal has been found"<<endl;
+//                goal_node = node_to_expand.index_in_map;
+//                break;
+//            }
+//        expand_state(node_to_expand,action_list,node_map,open,node_count,goal_gc);
+//        loop_iteration_counter++;
+//    }
+//
+//    if(goal_node!=-1)
+//    {
+//        cout<<"PATH FOUND"<<endl;
+//        actions = back_track(goal_node,node_map,std::move(actions),start_gc);
+//    }
+//    else
+//        cout<<"PATH NOT FOUND"<<endl;
 
     return std::move(actions);
 
