@@ -838,6 +838,7 @@ void print_list(const list<T> &my_list)
 
 struct Node
 {
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> gc;
     unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,GroundedAction,State_hasher> parents;
     //Consists of the state and the action pair which yields this state
     double gcost;
@@ -847,15 +848,17 @@ struct Node
 
     //---------------------------------------------------------
 
-    Node(unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,GroundedAction,State_hasher> new_parents,
+    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gc,
+         unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,GroundedAction,State_hasher> new_parents,
          double g_cost,
          double h_cost):
-         parents(new_parents),gcost(g_cost),hcost(h_cost){
+         gc(new_gc),parents(new_parents),gcost(g_cost),hcost(h_cost){
         fcost = calculate_fcost();
     }
 
-    Node(double g_cost):
-         gcost(g_cost),hcost(0){
+    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gc,
+         double g_cost):
+         gc(new_gc),gcost(g_cost),hcost(0){
         fcost = calculate_fcost();
     }
 
@@ -1187,14 +1190,15 @@ list<GroundedAction> planner(Env* env)
     const auto start_gc = env->get_initial_conditions();
     const auto goal_gc = env->get_goal_conditions();
     int node_count = 0;
-    Node start_node;
-    node_map.insert({start_gc,start_node});
+    Node start_node{start_gc,0};
+    node_map.insert({start_gc,std::move(start_node)});
     open.push(start_node);
     int goal_node = -1;
     int loop_iteration_counter = 1;
+    node_map.at(start_gc).print_node();
 //    while(!open.empty())
 //    {
-////        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
+//        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
 //        cout<<"--------------------------"<<endl;
 //        const auto node_to_expand = open.top();
 //        node_to_expand.print_node();
