@@ -1176,34 +1176,21 @@ void expand_state(const Node &present_node,
 }
 
 ////=====================================================================================================================
-//
-//list<GroundedAction> back_track(int goal_map_index,
-//                                const unordered_map<int,Node> &node_map,
-//                                list<GroundedAction> actions,
-//                                const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_gc)
-//{
-//    cout<<"Starting backtracking"<<endl;
-//    cout<<"Final goal index "<<goal_map_index<<endl;
-//    while(!are_all_elements_present_in_collection(node_map.at(goal_map_index).gc,start_gc))
-//    {
-//        double g_min = INT_MAX;
-//        int best_neighbor_vector_index = -2; //Some impossible value initialization
-//        for(int i=0;i<node_map.at(goal_map_index).neighbors.size();i++)
-//        {
-//            auto parent_index = node_map.at(goal_map_index).neighbors[i];
-//            if(node_map.at(parent_index).gcost<g_min)
-//            {
-//                g_min = node_map.at(parent_index).gcost;
-//                best_neighbor_vector_index = i;
-//            }
-//        }
-//        actions.emplace_back(node_map.at(goal_map_index).parent_gaction[best_neighbor_vector_index]);
-//        goal_map_index = node_map.at(goal_map_index).neighbors[best_neighbor_vector_index];
-//    }
-//
-//    actions.reverse();
-//    return std::move(actions);
-//}
+
+list<GroundedAction> back_track(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
+                                const unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,Node,State_hasher> &node_map,
+                                list<GroundedAction> actions,
+                                const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_gc)
+{
+    cout<<"Starting backtracking"<<endl;
+    while(!are_all_elements_present_in_collection(present_grounded_conditions,start_gc))
+    {
+        actions.emplace_back(node_map.at(present_grounded_conditions).parent_action);
+        present_grounded_conditions = node_map.at(present_grounded_conditions).parent;
+    }
+    actions.reverse();
+    return std::move(actions);
+}
 
 //=====================================================================================================================
 
@@ -1223,13 +1210,14 @@ list<GroundedAction> planner(Env* env)
     open.push(start_node);
     bool goal_reached = false;
     int loop_iteration_counter = 1;
+    auto final_grounded_conditions = unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> {GroundedCondition{"",list<string> {}}};
 //    node_map.at(start_gc).print_node();
     while(!open.empty())
     {
 //        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
 //        cout<<"--------------------------"<<endl;
         const auto node_to_expand = open.top();
-        node_to_expand.print_node();
+//        node_to_expand.print_node();
         open.pop();
 
         //Note below: We have this condition instead of checking if goal_gc is closed or not as goal can be partially specified.
@@ -1238,6 +1226,7 @@ list<GroundedAction> planner(Env* env)
         {
             cout<<"Goal has been found"<<endl;
             goal_reached = true;
+            final_grounded_conditions = node_to_expand.gc;
             break;
         }
 
@@ -1257,7 +1246,7 @@ list<GroundedAction> planner(Env* env)
     else
     {
         cout<<"PATH FOUND"<<endl;
-//        actions = back_track(goal_node,node_map,std::move(actions),start_gc);
+        actions = back_track(final_grounded_conditions,node_map,std::move(actions),start_gc);
     }
 
     return std::move(actions);
