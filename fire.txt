@@ -1,0 +1,20 @@
+Symbols: A,B,C,D,E,F,W,Q,R,H,L
+Initial conditions: On(A,B), On(B,Table), On(C,Table), Block(A), Block(B), Block(C), Clear(A), Clear(C)
+Goal conditions: On(B,C), On(C,A), On(A,Table)
+
+Actions:
+        FlyUp(a,b,x)
+        Preconditions: Robot(a), Quadcopter(b), On(b,x), On(a,x), Down(b), On(b,a)
+        Effects: Up(b), !Down(b), !On(b,a)
+
+        FlyDown(a,b,x)
+        Preconditions: Robot(a), Quadcopter(b), On(b,x), On(a,x), Up(b)
+        Effects: Down(b), !Up(b), On(b,a)
+
+        MoveRobot(b,x,y)
+        Preconditions: On(b,x), Robot(b)
+        Effects: On(b,y), !On(b,x)
+
+        Charge(b)
+        Preconditions: Quadcopter(b)
+        Effects: 
