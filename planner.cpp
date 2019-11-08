@@ -20,6 +20,13 @@
 #define ACTION_PRECONDITION 5
 #define ACTION_EFFECT 6
 
+//=====================================================================================================================
+/// Global variables
+
+int USE_HEURISTIC;
+
+//=====================================================================================================================
+
 class GroundedCondition;
 class Condition;
 class GroundedAction;
@@ -881,11 +888,18 @@ struct Node
     {
         //Write heuristics formula;
         double heuristic = 0;
-        for(const auto &grounded_cond:goal_coordinate)
+
+        if(USE_HEURISTIC==0)
+            {return heuristic;}
+        else if(USE_HEURISTIC==1)
         {
-            if(gc.find(grounded_cond)==gc.end())
-                heuristic++;
+            for(const auto &grounded_cond:goal_coordinate)
+            {
+                if(gc.find(grounded_cond)==gc.end())
+                    heuristic++;
+            }
         }
+
         return heuristic;
     }
 
@@ -1199,9 +1213,20 @@ list<GroundedAction> back_track(unordered_set<GroundedCondition, GroundedConditi
 
 //=====================================================================================================================
 
+void print_heuristic_information()
+{
+    if(USE_HEURISTIC==0)
+        cout<<"Using no heuristic"<<endl;
+    else if(USE_HEURISTIC==1)
+        cout<<"Using inadmissible heuristic"<<endl;
+}
+
+//=====================================================================================================================
+
 list<GroundedAction> planner(Env* env)
 {
-
+    USE_HEURISTIC = 1;
+    print_heuristic_information();
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
     unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,Node,State_hasher> node_map; //This serves as my map since it's an implicit directed graph
