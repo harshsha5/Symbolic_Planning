@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <queue>
 #include <climits>
+#include <chrono>
 
 #define SYMBOLS 0
 #define INITIAL 1
@@ -879,7 +880,13 @@ struct Node
     double calculate_hcost(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_coordinate) const
     {
         //Write heuristics formula;
-        return 0;
+        double heuristic = 0;
+        for(const auto &grounded_cond:goal_coordinate)
+        {
+            if(gc.find(grounded_cond)==gc.end())
+                heuristic++;
+        }
+        return heuristic;
     }
 
     void set_fcost(const double &new_f_cost)
@@ -1153,7 +1160,6 @@ void expand_state(const Node &present_node,
         {
             if(!node_map.count(new_grounded_conditions))
             {
-
                 node_map.insert({new_grounded_conditions,Node{new_grounded_conditions,present_node.gc,gaction,present_node.gcost+1,0}});
                 auto new_h_cost = node_map.at(new_grounded_conditions).calculate_hcost(goal_ground_conditions);
                 node_map.at(new_grounded_conditions).set_hcost(new_h_cost);
@@ -1163,7 +1169,6 @@ void expand_state(const Node &present_node,
             {
                 if(present_node.gcost+1<node_map.at(new_grounded_conditions).gcost)
                 {
-
                     node_map.at(new_grounded_conditions).set_gcost(present_node.gcost+1);
                     node_map.at(new_grounded_conditions).parent = present_node.gc;
                     node_map.at(new_grounded_conditions).parent_action = gaction;
@@ -1175,7 +1180,7 @@ void expand_state(const Node &present_node,
     }
 }
 
-////=====================================================================================================================
+//=====================================================================================================================
 
 list<GroundedAction> back_track(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> present_grounded_conditions,
                                 const unordered_map<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,Node,State_hasher> &node_map,
@@ -1206,18 +1211,21 @@ list<GroundedAction> planner(Env* env)
     const auto goal_gc = env->get_goal_conditions();
     int node_count = 0;
     Node start_node{start_gc,0};
+    start_node.set_hcost(start_node.calculate_hcost(goal_gc));
     node_map.insert({start_gc,start_node});
     open.push(start_node);
     bool goal_reached = false;
     int loop_iteration_counter = 1;
+    int num_states_expanded = 0;
     auto final_grounded_conditions = unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> {GroundedCondition{"",list<string> {}}};
 //    node_map.at(start_gc).print_node();
+    auto start = std::chrono::high_resolution_clock::now();
     while(!open.empty())
     {
 //        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
 //        cout<<"--------------------------"<<endl;
         const auto node_to_expand = open.top();
-//        node_to_expand.print_node();
+        node_to_expand.print_node();
         open.pop();
 
         //Note below: We have this condition instead of checking if goal_gc is closed or not as goal can be partially specified.
@@ -1234,10 +1242,14 @@ list<GroundedAction> planner(Env* env)
         {
             closed.insert(node_to_expand.gc);
             expand_state(node_to_expand,action_list,node_map,open,goal_gc,closed);
+            num_states_expanded++;
         }
 
         loop_iteration_counter++;
     }
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto time_taken_to_plan = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+    cout<<"Planning time: "<<time_taken_to_plan.count()<<endl;
 
     if(!goal_reached)
     {
@@ -1246,6 +1258,7 @@ list<GroundedAction> planner(Env* env)
     else
     {
         cout<<"PATH FOUND"<<endl;
+        cout<<"Number of states expanded: "<<num_states_expanded<<endl;
         actions = back_track(final_grounded_conditions,node_map,std::move(actions),start_gc);
     }
 
