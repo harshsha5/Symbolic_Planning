@@ -1160,7 +1160,6 @@ void expand_state(const Node &present_node,
                   const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_ground_conditions,
                   const unordered_set<unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>,State_hasher> &closed)
 {
-
     for(const auto &gaction:action_list)
     {
 
@@ -1225,7 +1224,7 @@ void print_heuristic_information()
 
 list<GroundedAction> planner(Env* env)
 {
-    USE_HEURISTIC = 1;
+    USE_HEURISTIC = 0;
     print_heuristic_information();
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
@@ -1250,7 +1249,7 @@ list<GroundedAction> planner(Env* env)
 //        cout<<"Loop iteration counter "<<loop_iteration_counter<<endl;
 //        cout<<"--------------------------"<<endl;
         const auto node_to_expand = open.top();
-        node_to_expand.print_node();
+//        node_to_expand.print_node();
         open.pop();
 
         //Note below: We have this condition instead of checking if goal_gc is closed or not as goal can be partially specified.
