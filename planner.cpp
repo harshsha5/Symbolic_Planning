@@ -855,7 +855,7 @@ struct Node
     double gcost;
     double hcost;
     double fcost;
-    static double heuristic_weight;
+    static constexpr double heuristic_weight=1;
 
     //---------------------------------------------------------
 
@@ -881,7 +881,7 @@ struct Node
 
     double calculate_fcost()
     {
-        return gcost + hcost;
+        return gcost + heuristic_weight*hcost;
     }
 
     double calculate_hcost(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_coordinate) const
@@ -1224,7 +1224,7 @@ void print_heuristic_information()
 
 list<GroundedAction> planner(Env* env)
 {
-    USE_HEURISTIC = 0;
+    USE_HEURISTIC = 1;
     print_heuristic_information();
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
