@@ -869,8 +869,15 @@ struct Node
     }
 
     Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gc,
-         double g_cost):
-         gc(new_gc),gcost(g_cost),hcost(0){
+              double g_cost):
+            gc(new_gc),gcost(g_cost),hcost(0){
+        fcost = calculate_fcost();
+    }
+
+    Node(unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> new_gc,
+         double g_cost,
+         double h_cost):
+            gc(new_gc),gcost(g_cost),hcost(h_cost){
         fcost = calculate_fcost();
     }
 
@@ -882,25 +889,6 @@ struct Node
     double calculate_fcost()
     {
         return gcost + heuristic_weight*hcost;
-    }
-
-    double calculate_hcost(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_coordinate) const
-    {
-        //Write heuristics formula;
-        double heuristic = 0;
-
-        if(USE_HEURISTIC==0)
-            {return heuristic;}
-        else if(USE_HEURISTIC==1)
-        {
-            for(const auto &grounded_cond:goal_coordinate)
-            {
-                if(gc.find(grounded_cond)==gc.end())
-                    heuristic++;
-            }
-        }
-
-        return heuristic;
     }
 
     void set_fcost(const double &new_f_cost)
@@ -929,21 +917,21 @@ struct Node
         }
         cout<<endl<<"----------------------------------------------------------------------"<<endl;
 
-//        if(!parent.size())
-//            cout<<"No Parent"<<endl;
-//        else
-//        {
-//            cout<<"Parents is: "<<endl;
-//            for(const auto &elt:parent)
-//            {
-//                cout<<elt.toString()<<"\t";
-//            }
-//            cout<<endl<<"-----ACTION------"<<endl;
-//            cout<<parent_action.toString()<<endl;
-//        }
-//        cout<<"----------------------------------------------------------------------"<<endl;
-//        cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
-//        cout<<"===================================================================="<<endl;
+        if(!parent.size())
+            cout<<"No Parent"<<endl;
+        else
+        {
+            cout<<"Parents is: "<<endl;
+            for(const auto &elt:parent)
+            {
+                cout<<elt.toString()<<"\t";
+            }
+            cout<<endl<<"-----ACTION------"<<endl;
+            cout<<parent_action.toString()<<endl;
+        }
+        cout<<"----------------------------------------------------------------------"<<endl;
+        cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
+        cout<<"===================================================================="<<endl;
     }
 };
 
@@ -975,6 +963,27 @@ struct Node_Comp{
         return a.fcost>b.fcost;
     }
 };
+
+//=====================================================================================================================
+
+    double calculate_hcost(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &start_coordinate,
+            const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> &goal_coordinate)
+    {
+        double heuristic = 0;
+
+        if(USE_HEURISTIC==0)
+            {return heuristic;}
+        else if(USE_HEURISTIC==1)
+        {
+            for(const auto &grounded_cond:goal_coordinate)
+            {
+                if(start_coordinate.find(grounded_cond)==start_coordinate.end())
+                    heuristic++;
+            }
+        }
+
+        return heuristic;
+    }
 
 //=====================================================================================================================
 
@@ -1173,9 +1182,8 @@ void expand_state(const Node &present_node,
         {
             if(!node_map.count(new_grounded_conditions))
             {
-                node_map.insert({new_grounded_conditions,Node{new_grounded_conditions,present_node.gc,gaction,present_node.gcost+1,0}});
-                auto new_h_cost = node_map.at(new_grounded_conditions).calculate_hcost(goal_ground_conditions);
-                node_map.at(new_grounded_conditions).set_hcost(new_h_cost);
+                const auto new_h_cost = calculate_hcost(new_grounded_conditions,goal_ground_conditions);
+                node_map.insert({new_grounded_conditions,Node{new_grounded_conditions,present_node.gc,gaction,present_node.gcost+1,new_h_cost}});
                 open.push(node_map.at(new_grounded_conditions));
             }
             else
@@ -1224,7 +1232,7 @@ void print_heuristic_information()
 
 list<GroundedAction> planner(Env* env)
 {
-    USE_HEURISTIC = 1;
+    USE_HEURISTIC = 0;
     print_heuristic_information();
     list<GroundedAction> actions;
     priority_queue<Node, vector<Node>, Node_Comp> open;
@@ -1234,8 +1242,7 @@ list<GroundedAction> planner(Env* env)
     const auto start_gc = env->get_initial_conditions();
     const auto goal_gc = env->get_goal_conditions();
     int node_count = 0;
-    Node start_node{start_gc,0};
-    start_node.set_hcost(start_node.calculate_hcost(goal_gc));
+    Node start_node{start_gc,0,calculate_hcost(start_gc,goal_gc)};
     node_map.insert({start_gc,start_node});
     open.push(start_node);
     bool goal_reached = false;
