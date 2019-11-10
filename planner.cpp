@@ -855,7 +855,7 @@ struct Node
     double gcost;
     double hcost;
     double fcost;
-    static constexpr double heuristic_weight=1;
+    static constexpr double heuristic_weight=2;
 
     //---------------------------------------------------------
 
@@ -929,21 +929,21 @@ struct Node
         }
         cout<<endl<<"----------------------------------------------------------------------"<<endl;
 
-        if(!parent.size())
-            cout<<"No Parent"<<endl;
-        else
-        {
-            cout<<"Parents is: "<<endl;
-            for(const auto &elt:parent)
-            {
-                cout<<elt.toString()<<"\t";
-            }
-            cout<<endl<<"-----ACTION------"<<endl;
-            cout<<parent_action.toString()<<endl;
-        }
-        cout<<"----------------------------------------------------------------------"<<endl;
-        cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
-        cout<<"===================================================================="<<endl;
+//        if(!parent.size())
+//            cout<<"No Parent"<<endl;
+//        else
+//        {
+//            cout<<"Parents is: "<<endl;
+//            for(const auto &elt:parent)
+//            {
+//                cout<<elt.toString()<<"\t";
+//            }
+//            cout<<endl<<"-----ACTION------"<<endl;
+//            cout<<parent_action.toString()<<endl;
+//        }
+//        cout<<"----------------------------------------------------------------------"<<endl;
+//        cout<<"gcost: "<<gcost<<"\t"<<"hcost: "<<hcost<<"\t"<<"fcost: "<<fcost<<endl;
+//        cout<<"===================================================================="<<endl;
     }
 };
 

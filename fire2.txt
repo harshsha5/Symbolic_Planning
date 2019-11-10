@@ -1,0 +1,40 @@
+Symbols: A,B,C,D,E,F,W,Q,R
+Initial conditions: At(Q,B), Up(Q), At(R,A), Location(A), Location(B), Location(C), Location(D), Location(E), Location(F), Location(W), Quadcopter(Q), Robot(R), Fire3(F), Charged(Q), TankEmpty(Q)
+Goal conditions: Fire0(F)
+
+Actions:
+        FlyUp(a,b,x)
+        Preconditions: Robot(a), Quadcopter(b), At(b,x), At(a,x), Down(b), On(b,a), Charged(b), Location(x)
+        Effects: Up(b), !Down(b), !On(b,a)
+
+        FlyDown(a,b,x)
+        Preconditions: Robot(a), Quadcopter(b), At(b,x), At(a,x), Up(b), Location(x)
+        Effects: Down(b), !Up(b), On(b,a)
+
+        MoveRobot(b,x,y)
+        Preconditions: At(b,x), Robot(b), Location(x), Location(y)
+        Effects: At(b,y), !At(b,x)
+
+        MoveRobot&Quadcopter(a,b,x,y)
+        Preconditions: At(b,x), Robot(b), At(a,x), Down(a), Quadcopter(a), Location(x), Location(y), On(a,b)
+        Effects: At(b,y), !At(b,x), At(a,y), !At(a,x)
+
+        Charge(a,b)
+        Preconditions: Robot(a), Quadcopter(b), On(b,a), Uncharged(b)
+        Effects: Charged(b), !Uncharged(b)
+
+        FillTank(a,b)
+        Preconditions: Robot(a), Quadcopter(b), On(b,a), At(b,W), At(a,W), Location(W), TankEmpty(b) 
+        Effects: TankFull(b), !TankEmpty(b)
+
+        PourWaterOnFire3(b)
+        Preconditions: At(b,F), Quadcopter(b), Charged(b), Up(b), TankFull(b), Fire3(F), Location(F)
+        Effects: UnCharged(b), !Charged(b), TankEmpty(b), Fire2(F), !Fire3(F), !TankFull(b)
+
+        PourWaterOnFire2(b)
+        Preconditions: At(b,F), Quadcopter(b), Charged(b), Up(b), TankFull(b), Fire2(F), Location(F)
+        Effects: UnCharged(b), !Charged(b), TankEmpty(b), Fire1(F), !Fire2(F), !TankFull(b)
+
+        PourWaterOnFire1(b)
+        Preconditions: At(b,F), Quadcopter(b), Charged(b), Up(b), TankFull(b), Fire1(F), Location(F)
+        Effects: UnCharged(b), !Charged(b), TankEmpty(b), Fire0(F), !Fire1(F), !TankFull(b)
